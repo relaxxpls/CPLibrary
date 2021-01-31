@@ -2,8 +2,7 @@
 using namespace std;
 #define int         long long
 #define sz(x)       (int) x.size()
-#define all(x)      x.begin(), x.end()
-#define vi          vector<int>
+const int OO    = 1e18;
 
 // Source: github.com/e-maxx-eng/e-maxx-eng-aux/blob/master/src/polynomial.cpp
 #define MODULAR // Work under a finite field (modint, NTT, CRT)
@@ -14,7 +13,7 @@ template<typename T> struct poly {
     template<typename... A> poly(A... x) : a(x...) {}
     poly(const initializer_list<T> &x)   : a(x) {}
 
-    // Operators (Arithmatic)
+    // Operators (Arithmatic):
     poly operator +  (const poly &p) const {
         vector<T> res(max(size(), sz(p)));
         for (int i=0; i<sz(res); i++) res[i] = coef(i) + p.coef(i);
@@ -25,15 +24,15 @@ template<typename T> struct poly {
         return res; }
     poly operator *  (const poly &p) {
         if (!sz(a) || !sz(p.a)) return {};
-        vi A(sz(a)), B(sz(p.a));
+        vector<int> A(sz(a)), B(sz(p.a));
         for (int i=0; i<sz( a ); i++) A[i] = (int)a[i];
         for (int i=0; i<sz(p.a); i++) B[i] = (int)p.a[i];
         #ifdef MODULAR
-            vi res = NTT::operator*(A, B);
+            vector<int> res = NTT::operator*(A, B);
         #else
-            vi res = FFT::operator*(A, B);
+            vector<int> res = FFT::operator*(A, B);
         #endif
-        return poly(all(res)); }
+        return poly(res.begin(), res.end()); }
     poly operator /  (const poly &p) { return divmod(*this,  p).F; }
     poly operator %  (const poly &p) { return divmod(*this,  p).S; }
     poly operator += (const poly &p) { return *this = (*this) + p; }
@@ -54,13 +53,13 @@ template<typename T> struct poly {
     poly operator *= (const T &x)  { return *this = (*this) * x; }
     poly operator /= (const T &x)  { return *this = (*this) / x; }
     T&   operator [] (const int i) { assert(i<sz(a)); return a[i]; }
-    T    operator () (const int x) {            // Evaluate polynomial at x
-        T res = 0; for(int i=deg(); i>=0; i--) res = res*x + a[i];
-        return res; }
+    T    operator () (const int x) {                // Evaluate polynomial at x
+        T res=0; for(int i=deg(); i>=0; i--) res*=x, res+=a[i]; return res; }
 
-    // Extra Functions
-    inline void normalize() { while (sz(a)>1 && a.back()==T(0)) a.pop_back(); }
+    // Extra Functions:
+    inline void normalize() { while (sz(a)>1 && lead()==T(0)) a.pop_back(); }
     inline T coef(int i) const { return (i<sz(a) ? a[i] : T(0)); } // 0 indexed
+    inline T& lead()           { return a.back(); }
     inline int size()    const { return sz(a); }
     inline int deg()     const { return a.empty() ? -OO : sz(a)-1; } // Degree
     void push_back(int x) { normalize(), a.push_back(x); }
@@ -80,12 +79,12 @@ template<typename T> struct poly {
         return r.mod_xk(n); }
     friend pair<poly, poly> divmod(poly a, poly b) { // Q = a/b, R = a - Q*b
         a.normalize(), b.normalize(); assert(sz(b));
-        T lst = b.a.back(), lstInv = T(1)/lst; int diff = sz(a)-sz(b);
+        T lst = b.lead(), lstInv = T(1)/lst; int diff = sz(a)-sz(b);
         poly q(max(diff+1, 0LL));
         for (T &x: a.a) x *= lstInv;
         for (T &x: b.a) x *= lstInv;
         while (diff>=0) {
-            q[diff] = a.a.back();
+            q[diff] = a.lead();
             for (int i=0; i<sz(b); i++) a[i+diff] -= q[diff] * b[i];
             a.normalize(); diff = sz(a)-sz(b); }
         for (T &t: a.a) t *= lst;
@@ -93,7 +92,7 @@ template<typename T> struct poly {
 
     friend poly gcd(poly a, poly b) { return sz(b) ? gcd(b, a%b) : a; }
 
-    // Chirp Z Transform: O(NlogN)
+    // Chirp Z Transform O(NlogN):
     poly mulx(T x) {              // component-wise multiplication with x^k
         T cur = 1; poly res(*this);
         for(int i=0; i<size(); i++) res.a[i] *= cur, cur *= x;
@@ -114,14 +113,14 @@ template<typename T> struct poly {
         for(int i=0; i<n; i++) res[i] = w[i];
         return res; }
     vector<T> chirpZ(T z, int n) {      // P(1), P(z), P(z^2), ..., P(z^(n-1))
-        auto even = chirpZEven(z, (n+1)/2), odd = mulx(z).chirpZEven(z, n/2);
-        vector<T> res(n);
+        vector<T> even = chirpZEven(z, (n+1)/2);
+        vector<T> res(n), odd = mulx(z).chirpZEven(z, n/2);
         for(int i=0; i<n/2; i++) res[i<<1] = even[i], res[i<<1|1] = odd[i];
         if(n%2) res[n-1] = even.back();
         return res; }
 
-    // Calculus
-    poly differential() const {
+    // Calculus:
+    poly derivative() const {
         vector<T> res(size()-1);
         for(int i=1; i<size(); i++) res[i-1] = coef(i) * i;
         return res; }
@@ -130,13 +129,13 @@ template<typename T> struct poly {
         for(int i=0; i<size(); i++) res[i+1] = coef(i) / (i+1);
         return res; }
 
-    // Input-Output
+    // Input-Output:
     friend istream& operator>>(istream &cin, poly &p) {
         for(int i=0; i<sz(p); i++) cin>>p[i]; return cin; }
     friend ostream& operator<<(ostream &cout, poly p) {
         for(int i=0; i<sz(p); i++) cout<<p.coef(i)<<" "; return cout; }
 
-    // Polynomial represents digits (normalize)
+    // Polynomial represents digits (normalize):
     friend poly base10(poly a) {                // Convert to base 10
         int c=0;
         for(int i=0; i<sz(a); i++) a[i] += c, c = a[i]/10, a[i] -= 10*c;
